@@ -93,3 +93,61 @@ class LinModel(linear_model.LinearRegression):
         print("N observations: {}".format(self.nobs))
         print("df_model: {}".format(self.df_model))
         print("df_resid: {}".format(self.df_resid))
+
+    def get_confidence_interval(self,X=[]):
+        """
+
+        Calculates the confidence interval for each datapoint, given a model fit
+
+
+        """
+        df_results=pd.DataFrame({'y_hat'=numpy.zeros(X.shape[0])})
+        y_hat=self.predict(X)
+        w=numpy.matrix(df_orig[self.params.index.values].values)
+        df_results['y_hat']=y_hat
+        
+
+        deg_free= self.nobs-self.params.shape[0]
+        s_2=est.ssr/(deg_free)
+
+     
+        X=df_model[est.params.index.values].values
+        XT_X=numpy.matrix(X).T*\
+            numpy.matrix(X) 
+        #print "X_XT"
+        #print X_XT
+        
+    #    print "w"
+    #    print numpy.shape(w)
+    #    print "XT_T"
+    #    print numpy.shape(XT_X)
+        #logging.debug(numpy.shape(s_2*inv(XT_X)))
+        s_c_2=numpy.array(w*s_2*inv(XT_X)*w.T)
+        #logging.debug("s_c_2: {}".format(s_c_2))
+        #we only want the diagonal
+        s_c_2=numpy.diagonal(s_c_2)
+        #logging.debug("s_c_2 diag: {}".format(s_c_2))
+        #tau=df_new.apply(lambda x:numpy.matrix(x[est.params.index.values].values),axis=1)
+    #        X_XT*numpy.matrix(x[est.params.index.values].values).T)
+    #    tau=numpy.matrix(df_new[est.params.index.values].values[])*X_XT*\
+    #        numpy.matrix(df_new[est.params.index.values].values).T
+        #print "tau"
+        #print numpy.shape(numpy.squeeze(tau))
+        t_val=stats.t.ppf(1-alpha/2,deg_free)
+        upper=E_Y+t_val*numpy.sqrt(s_c_2)
+        lower=E_Y-t_val*numpy.sqrt(s_c_2)
+        
+        #print upper
+        #print df_new.head()
+        #print numpy.shape(upper)
+        #print df_new.shape
+    #    print "s_c_2"
+    #    print numpy.shape(s_c_2)
+        df_orig['s_c_2']=s_c_2
+        #df_orig['sigma_tilde']=sigma_tilde
+        df_orig['t']=t_val
+        
+        df_orig['upper_y_hat']=upper
+        df_orig['lower_y_hat']=lower
+
+
