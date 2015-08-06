@@ -94,10 +94,11 @@ class LinModel(linear_model.LinearRegression):
         print("df_model: {}".format(self.df_model))
         print("df_resid: {}".format(self.df_resid))
 
-    def get_confidence_interval(self,X=[]):
+    def get_confidence_interval_for_mean(self,X=[]):
         """
 
         Calculates the confidence interval for each datapoint, given a model fit
+        This is the confidence interval of the model, not the prediction interval
 
 
         """
@@ -109,6 +110,7 @@ class LinModel(linear_model.LinearRegression):
 
         deg_free= self.nobs-self.params.shape[0]
         s_2=est.ssr/(deg_free)
+        self.s_y=numpy.sqrt(s_2)
 
      
         X=df_model[est.params.index.values].values
@@ -150,4 +152,30 @@ class LinModel(linear_model.LinearRegression):
         df_orig['upper_y_hat']=upper
         df_orig['lower_y_hat']=lower
 
+
+    def get_prediction_interval(self,X=[]):
+        """
+
+        Chuck out the 95% prediction interval for the data passed
+
+        """
+        #need to get the idempotent matrix
+        i_n=numpy.matrix(numpy.ones(self.nobs))
+        M_0=numpy.matrix.eye(self.nobs)-numpy.power(self.nobs,-1)*i_n*i_n.T
+
+        #Z is the X's without the offset
+        Z=numpy.matrix(X[:,2:])
+
+        Z_M_Z=Z.T*M_0*Z
+
+        deg_free= self.nobs-self.params.shape[0]
+        s_2=est.ssr/(deg_free)
+        self.s_y=numpy.sqrt(s_2)
+
+        df_pred=pd.DataFrame({'upper':numpy.zeros(X.shape[0]),'lower':numpy.zeros(X.shape[0])})
+        for indx in df_pred.index:
+            x_0_x_bar=numpy.matrix(df_pred.ix[indx].values-self.X_bar)
+
+            se_e = self.s_y*(1 + (1/self.nobs) +
+                numpy.sum(numpy.sum(x_0_x_bar.T*x_0_x_bar*Z_M_Z)))
 
