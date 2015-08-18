@@ -2,6 +2,10 @@ from sklearn import linear_model
 from ml_ext import stats
 from ml_ext import numpy
 from ml_ext import pd
+from ml_ext import logging
+from ml_ext import inv
+from ml_ext import plt
+from ml_ext import sns
 
 
 class LinModel(linear_model.LinearRegression):
@@ -16,7 +20,6 @@ class LinModel(linear_model.LinearRegression):
 
     Original forked from https://gist.github.com/brentp/5355925
     """
-
     def __init__(self, *args, **kwargs):
         if not "fit_intercept" in kwargs:
             kwargs['fit_intercept'] = False
@@ -24,9 +27,15 @@ class LinModel(linear_model.LinearRegression):
                 .__init__(*args, **kwargs)
  
     def fit(self, X, y, n_jobs=1):
+        """
+        y can be series or array
+        X can be dataframe or ndarry (N datapoints x M features)
+        """
         self = super(LinModel, self).fit(X, y, n_jobs)
 
+
         self.nobs=X.shape[0]
+        self.nparams=X.shape[1]
         #remove an extra 1 for the alpha (k-1)
         self.df_model=X.shape[1]-1
         #(n-k-1) - we always assume an alpha is present
@@ -35,16 +44,28 @@ class LinModel(linear_model.LinearRegression):
         y_bar=y.mean()
         y_hat=self.predict(X)
         #explained sum of squares
-        SSE=numpy.sum([numpy.power(y-y_bar,2) for y in y_hat])
+        SSE=numpy.sum([numpy.power(val-y_bar,2) for val in y_hat])
         e=numpy.matrix(y-y_hat).T
-        SST=numpy.sum([numpy.power(y-y_bar,2) for y in y])
+        # logging.debug(y_bar)
+        # logging.debug(y)
+        SST=numpy.sum([numpy.power(val-y_bar,2) for val in y])
         SSR=numpy.sum([numpy.power(x,2) for x in e])
         #print(SSR)
         
         #mean squared error of the residuals (unbiased)
         #square root of this is the standard error of the regression
         s_2 = SSR / (self.df_resid+1)
+        self.s_y=numpy.sqrt(s_2)
         #print(s_2)
+
+        #Also get the means of the independent variables
+        if isinstance(X,pd.core.frame.DataFrame):
+            #assume its' called alpha
+            self.X_bar=X[X.columns[X.columns!='alpha']].mean()
+        else:
+            #assume its the first column
+            self.X_bar=numpy.mean(X.values,axis=0)[1:]
+        
 
         # #print(numpy.sqrt(numpy.diagonal(sse * numpy.linalg.inv(numpy.dot(X.T, X)))))
         # #standard error of estimator bk
@@ -76,7 +97,29 @@ class LinModel(linear_model.LinearRegression):
             ((1-self.rsquared)/(self.df_resid+1))
         self.f_stat=f_value
         self.f_pvalue=stats.f.pdf(f_value,self.df_model,self.df_resid+1)
-        return self
+        # return self
+
+    def get_confidence_intervals_for_coefs(self):
+        """
+
+        Gets the upper and lower bound 95% confidence intervals for
+        each coefficient excluding alpha
+
+        t_k=(b_k-beta_k)/sqrt(s^2 * Skk)
+
+        """
+        alpha=0.05
+        t_val=stats.t.ppf(1-alpha/2,self.df_resid+1)
+
+        df_res=pd.DataFrame({'upper':numpy.zeros(len(self.coef_)),\
+            'lower':numpy.zeros(len(self.coef_)),\
+            'b':self.coef_},index=self.independent_)
+
+        for ii,var in enumerate(self.independent_):
+            df_res.loc[var,'upper']=df_res.loc[var,'b']+t_val*self.se[ii]
+            df_res.loc[var,'lower']=df_res.loc[var,'b']-t_val*self.se[ii]
+
+        return df_res
 
     def summary(self):
         print("---------------------------------------")
@@ -102,18 +145,11 @@ class LinModel(linear_model.LinearRegression):
 
 
         """
-        df_results=pd.DataFrame({'y_hat'=numpy.zeros(X.shape[0])})
+        df_results=pd.DataFrame({'y_hat':numpy.zeros(X.shape[0])})
         y_hat=self.predict(X)
-        w=numpy.matrix(df_orig[self.params.index.values].values)
-        df_results['y_hat']=y_hat
-        
-
-        deg_free= self.nobs-self.params.shape[0]
-        s_2=est.ssr/(deg_free)
-        self.s_y=numpy.sqrt(s_2)
+        w=numpy.matrix(X)
 
      
-        X=df_model[est.params.index.values].values
         XT_X=numpy.matrix(X).T*\
             numpy.matrix(X) 
         #print "X_XT"
@@ -124,7 +160,7 @@ class LinModel(linear_model.LinearRegression):
     #    print "XT_T"
     #    print numpy.shape(XT_X)
         #logging.debug(numpy.shape(s_2*inv(XT_X)))
-        s_c_2=numpy.array(w*s_2*inv(XT_X)*w.T)
+        s_c_2=numpy.array(w*numpy.power(self.s_y,2)*inv(XT_X)*w.T)
         #logging.debug("s_c_2: {}".format(s_c_2))
         #we only want the diagonal
         s_c_2=numpy.diagonal(s_c_2)
@@ -135,23 +171,21 @@ class LinModel(linear_model.LinearRegression):
     #        numpy.matrix(df_new[est.params.index.values].values).T
         #print "tau"
         #print numpy.shape(numpy.squeeze(tau))
-        t_val=stats.t.ppf(1-alpha/2,deg_free)
-        upper=E_Y+t_val*numpy.sqrt(s_c_2)
-        lower=E_Y-t_val*numpy.sqrt(s_c_2)
+        #95% confidence interval so alpha =0.95
+        alpha=0.05
+        t_val=stats.t.ppf(1-alpha/2,self.df_resid+1)
+        upper=y_hat+t_val*numpy.sqrt(s_c_2)
+        lower=y_hat-t_val*numpy.sqrt(s_c_2)
         
-        #print upper
-        #print df_new.head()
-        #print numpy.shape(upper)
-        #print df_new.shape
-    #    print "s_c_2"
-    #    print numpy.shape(s_c_2)
-        df_orig['s_c_2']=s_c_2
-        #df_orig['sigma_tilde']=sigma_tilde
-        df_orig['t']=t_val
-        
-        df_orig['upper_y_hat']=upper
-        df_orig['lower_y_hat']=lower
 
+        # df_orig['s_c_2']=s_c_2
+        # #df_orig['sigma_tilde']=sigma_tilde
+        # df_orig['t']=t_val
+        
+        # df_orig['upper_y_hat']=upper
+        # df_orig['lower_y_hat']=lower
+        df=pd.DataFrame({'y_hat':y_hat,'upper_mean':upper,'lower_mean':lower})
+        return (df)
 
     def get_prediction_interval(self,X=[]):
         """
@@ -161,21 +195,105 @@ class LinModel(linear_model.LinearRegression):
         """
         #need to get the idempotent matrix
         i_n=numpy.matrix(numpy.ones(self.nobs))
-        M_0=numpy.matrix.eye(self.nobs)-numpy.power(self.nobs,-1)*i_n*i_n.T
+        M_0=numpy.matrix(numpy.eye(self.nobs))-numpy.power(self.nobs,-1)*i_n*i_n.T
 
         #Z is the X's without the offset
-        Z=numpy.matrix(X[:,2:])
+        if isinstance(X,pd.core.frame.DataFrame):
+            #assume its' called alpha
+            Z=numpy.matrix(X[X.columns[X.columns!='alpha']])
+        else:
+            #assume its the first column
+            Z=numpy.matrix(X[:,1:])
 
         Z_M_Z=Z.T*M_0*Z
 
-        deg_free= self.nobs-self.params.shape[0]
-        s_2=est.ssr/(deg_free)
-        self.s_y=numpy.sqrt(s_2)
 
-        df_pred=pd.DataFrame({'upper':numpy.zeros(X.shape[0]),'lower':numpy.zeros(X.shape[0])})
+        df_pred=pd.DataFrame({'upper_pred':numpy.zeros(X.shape[0]),'lower_pred':numpy.zeros(X.shape[0])})
+        df_pred['y_hat']=self.predict(X)
+        alpha=0.05
+        t_val=stats.t.ppf(1-alpha/2,self.df_resid+1)
         for indx in df_pred.index:
-            x_0_x_bar=numpy.matrix(df_pred.ix[indx].values-self.X_bar)
+            # print(df_pred.ix[indx].values[1:])
+            # print(self.X_bar)
+            x_0_x_bar=numpy.matrix(X.ix[indx].values[1:]-self.X_bar)
+            # print(numpy.shape(x_0_x_bar))
+            # print("************")
+            se_e = self.s_y*numpy.sqrt(1 + (1/self.nobs) +
+                x_0_x_bar*inv(Z_M_Z)*x_0_x_bar.T)
 
-            se_e = self.s_y*(1 + (1/self.nobs) +
-                numpy.sum(numpy.sum(x_0_x_bar.T*x_0_x_bar*Z_M_Z)))
+            df_pred.loc[indx,'upper_pred']=df_pred.loc[indx,'y_hat']+t_val*se_e
+            df_pred.loc[indx,'lower_pred']=df_pred.loc[indx,'y_hat']-t_val*se_e
 
+        return df_pred
+
+
+
+
+def test_pred_interval(show_plot=False):
+    from ml_ext import examples
+    (coefs,df)=examples.gen_simplemodel_data(n=50,k=3)
+    df.sort('X1',inplace=True)
+    lr=LinModel()
+    X=df[df.columns[df.columns!='y']]
+    y=df.y
+
+
+    lr.fit(X=X,y=y)
+    lr.summary()
+    df_ci=lr.get_confidence_interval_for_mean(X)
+    df_pi=lr.get_prediction_interval(X)
+
+    #Now use statsmodels to compare
+    from statsmodels.sandbox.regression.predstd import wls_prediction_std
+    import statsmodels.api as sm
+    re = sm.OLS(y, X).fit()
+    prstd, iv_l, iv_u = wls_prediction_std(re)
+
+    if show_plot:
+        (fig,ax)=plt.subplots(nrows=2,ncols=1,figsize=[14,12])
+
+        cols=sns.color_palette('husl',n_colors=4)
+        ax[0].scatter(X.X1,y,label='y',color=cols[3],alpha=0.4)
+        
+        ax[0].plot(X.X1,df_pi['upper_pred'],label='pred',color=cols[1],alpha=0.5)
+        ax[0].plot(X.X1,df_pi['lower_pred'],color=cols[1],alpha=0.5)
+        ax[0].plot(X.X1,df_ci['upper_mean'],color=cols[2],alpha=0.5)
+        ax[0].plot(X.X1,df_ci['lower_mean'],label='mean_ci',color=cols[2],alpha=0.5)
+        ax[0].scatter(X.X1,df_pi['y_hat'],label='y_hat',color=cols[0],alpha=0.5)
+        ax[0].legend(loc='best')
+
+        ax[1].scatter(X.X1,y,label='y',color=cols[3],alpha=0.4)
+        ax[1].scatter(X.X1,df_ci['y_hat'],label='y_hat',color=cols[0],alpha=0.5)
+        ax[1].plot(X.X1,iv_u,label='wls',color=cols[1],alpha=0.5)
+        ax[1].plot(X.X1,iv_l,color=cols[1],alpha=0.5)
+        ax[1].legend(loc='best')
+
+    #get difference between uppers from each and check they are within 1%
+    overall_diff=100*numpy.sum(iv_u-df_pi['upper_pred'])/numpy.sum(iv_u)
+    logging.debug("Overall % difference in prediction ranges for upper bound: {}".format(overall_diff))
+    assert overall_diff<0.1
+
+def test_conf_interval_for_coefs():
+    from ml_ext import examples
+    (coefs,df)=examples.gen_simplemodel_data(n=50,k=1)
+    #print(df.head())
+    #df.sort('X0',inplace=True)
+    lr=LinModel()
+    X=df[df.columns[df.columns!='y']]
+    y=df.y
+
+    lr.fit(X=X,y=y)
+
+    ci=lr.get_confidence_intervals_for_coefs()
+    # print?(lr.se)
+    import statsmodels.api as sm
+    re = sm.OLS(y, X).fit()
+
+    rmse=0
+    for indx in ci.index.values:
+        # print(re.conf_int().ix[indx,0])
+        # print(ci.ix[indx,'lower'])
+        rmse=rmse+numpy.power((re.conf_int().ix[indx,0]-ci.ix[indx,'lower'])/ci.ix[indx,'b'],2)
+
+    assert 100*rmse/ci.shape[0]<0.1
+    print("Error on confidence interval: {} %".format(100*rmse))
