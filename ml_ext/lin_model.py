@@ -43,9 +43,11 @@ class LinModel(linear_model.LinearRegression):
         #standard error of the regression 
         y_bar=y.mean()
         y_hat=self.predict(X)
+        self.fittedvalues=y_hat
         #explained sum of squares
         SSE=numpy.sum([numpy.power(val-y_bar,2) for val in y_hat])
         e=numpy.matrix(y-y_hat).T
+        self.resid=numpy.ravel(e)
         # logging.debug(y_bar)
         # logging.debug(y)
         SST=numpy.sum([numpy.power(val-y_bar,2) for val in y])
@@ -145,6 +147,8 @@ class LinModel(linear_model.LinearRegression):
 
 
         """
+        if isinstance(X,pd.core.frame.DataFrame):
+            X=X[self.independent_]
         df_results=pd.DataFrame({'y_hat':numpy.zeros(X.shape[0])})
         y_hat=self.predict(X)
         w=numpy.matrix(X)
@@ -192,19 +196,24 @@ class LinModel(linear_model.LinearRegression):
 
         Chuck out the 95% prediction interval for the data passed
 
+        Note that if X is a dataframe it may contain more columns than there are in the original data,
+        therefore just pull out what we're after
+
         """
         #need to get the idempotent matrix
         i_n=numpy.matrix(numpy.ones(self.nobs))
         M_0=numpy.matrix(numpy.eye(self.nobs))-numpy.power(self.nobs,-1)*i_n*i_n.T
 
         #Z is the X's without the offset
+        # logging.debug(X.head())
         if isinstance(X,pd.core.frame.DataFrame):
             #assume its' called alpha
+            X=X[self.independent_]
             Z=numpy.matrix(X[X.columns[X.columns!='alpha']])
         else:
             #assume its the first column
             Z=numpy.matrix(X[:,1:])
-
+        # logging.debug(X.head())
         Z_M_Z=Z.T*M_0*Z
 
 
