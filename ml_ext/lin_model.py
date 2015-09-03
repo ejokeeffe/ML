@@ -201,8 +201,9 @@ class LinModel(linear_model.LinearRegression):
 
         """
         #need to get the idempotent matrix
-        i_n=numpy.matrix(numpy.ones(self.nobs))
-        M_0=numpy.matrix(numpy.eye(self.nobs))-numpy.power(self.nobs,-1)*i_n*i_n.T
+        i_n=numpy.matrix(numpy.ones(X.shape[0]))
+        n_obs=X.shape[0]
+        M_0=numpy.matrix(numpy.eye(n_obs))-numpy.power(n_obs,-1)*i_n*i_n.T
 
         #Z is the X's without the offset
         # logging.debug(X.head())
@@ -214,6 +215,8 @@ class LinModel(linear_model.LinearRegression):
             #assume its the first column
             Z=numpy.matrix(X[:,1:])
         # logging.debug(X.head())
+        
+
         Z_M_Z=Z.T*M_0*Z
 
 
