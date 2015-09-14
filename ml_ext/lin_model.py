@@ -123,6 +123,9 @@ class LinModel(linear_model.LinearRegression):
 
         return df_res
 
+    def get_coefs_as_df(self):
+        return pd.DataFrame({'coef':self.coef_},index=self.independent_)
+
     def summary(self):
         print("---------------------------------------")
         print("Variables: {}".format(self.independent_))
@@ -222,6 +225,7 @@ class LinModel(linear_model.LinearRegression):
 
         df_pred=pd.DataFrame({'upper_pred':numpy.zeros(X.shape[0]),'lower_pred':numpy.zeros(X.shape[0])})
         df_pred['y_hat']=self.predict(X)
+        df_pred['percent_ci']=0.0
         alpha=0.05
         t_val=stats.t.ppf(1-alpha/2,self.df_resid+1)
         for indx in df_pred.index:
@@ -236,6 +240,7 @@ class LinModel(linear_model.LinearRegression):
             df_pred.loc[indx,'upper_pred']=df_pred.loc[indx,'y_hat']+t_val*se_e
             df_pred.loc[indx,'lower_pred']=df_pred.loc[indx,'y_hat']-t_val*se_e
 
+            df_pred.loc[indx,'percent_ci']=100*2*t_val*se_e/df_pred.loc[indx,'y_hat']
         return df_pred
 
 
