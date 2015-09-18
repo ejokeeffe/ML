@@ -64,18 +64,28 @@ class LinModel(linear_model.LinearRegression):
         if isinstance(X,pd.core.frame.DataFrame):
             #assume its' called alpha
             self.X_bar=X[X.columns[X.columns!='alpha']].mean()
+            Z=numpy.matrix(X[X.columns[X.columns!='alpha']])
         else:
             #assume its the first column
             self.X_bar=numpy.mean(X.values,axis=0)[1:]
+            Z=numpy.matrix(X[:,1:])
         
-
+        i_n=numpy.matrix(numpy.ones(self.nobs))
+        M_0=numpy.matrix(numpy.eye(self.nobs))-numpy.power(self.nobs,-1)*i_n*i_n.T
+        self.Z_M_Z=Z.T*M_0*Z
         # #print(numpy.sqrt(numpy.diagonal(sse * numpy.linalg.inv(numpy.dot(X.T, X)))))
         # #standard error of estimator bk
         X_mat=numpy.matrix(X.values)
         #print(X_mat)
-        X_dash_X=X_mat.T*X_mat
-        #se = numpy.sqrt(numpy.diagonal(s_2 * numpy.linalg.inv(numpy.matrix(X.T, X))))
-        se=numpy.sqrt(numpy.diagonal(s_2 * numpy.linalg.inv(X_dash_X)))
+        self.X_dash_X=X_mat.T*X_mat
+        # we get nans using this approach so calculate each one separately
+        # se=numpy.zeros(self.nparams)
+        # for ii in range(self.nparams):
+        #     se[ii]=numpy.sqrt(X_dash_X[ii,ii]*s_2)
+        # logging.debug(s_2)
+        # logging.debug(numpy.linalg.inv(X_dash_X))
+        # #se = numpy.sqrt(numpy.diagonal(s_2 * numpy.linalg.inv(numpy.matrix(X.T, X))))
+        se=numpy.sqrt(numpy.diagonal(s_2 * numpy.linalg.inv(self.X_dash_X)))
 
         self.se= se
         self.t = self.coef_ / se
@@ -86,8 +96,7 @@ class LinModel(linear_model.LinearRegression):
             self.independent_=X.columns.values
         #t_val=stats.t.ppf(1-0.05/2,y.shape[0] - X.shape[1])
 
-        #print("t_val {},{}".format(t_val,self.p))
-        #totla sum of squares
+        
         
         #R2 - 1-SSR/SST
         self.rsquared=1-SSR/SST
@@ -157,8 +166,8 @@ class LinModel(linear_model.LinearRegression):
         w=numpy.matrix(X)
 
      
-        XT_X=numpy.matrix(X).T*\
-            numpy.matrix(X) 
+        # XT_X=numpy.matrix(X).T*\
+        #     numpy.matrix(X) 
         #print "X_XT"
         #print X_XT
         
@@ -167,7 +176,7 @@ class LinModel(linear_model.LinearRegression):
     #    print "XT_T"
     #    print numpy.shape(XT_X)
         #logging.debug(numpy.shape(s_2*inv(XT_X)))
-        s_c_2=numpy.array(w*numpy.power(self.s_y,2)*inv(XT_X)*w.T)
+        s_c_2=numpy.array(w*numpy.power(self.s_y,2)*inv(self.X_dash_X)*w.T)
         #logging.debug("s_c_2: {}".format(s_c_2))
         #we only want the diagonal
         s_c_2=numpy.diagonal(s_c_2)
@@ -206,21 +215,14 @@ class LinModel(linear_model.LinearRegression):
         #need to get the idempotent matrix
         i_n=numpy.matrix(numpy.ones(X.shape[0]))
         n_obs=X.shape[0]
-        M_0=numpy.matrix(numpy.eye(n_obs))-numpy.power(n_obs,-1)*i_n*i_n.T
+        # M_0=numpy.matrix(numpy.eye(n_obs))-numpy.power(n_obs,-1)*i_n*i_n.T
 
         #Z is the X's without the offset
         # logging.debug(X.head())
         if isinstance(X,pd.core.frame.DataFrame):
             #assume its' called alpha
             X=X[self.independent_]
-            Z=numpy.matrix(X[X.columns[X.columns!='alpha']])
-        else:
-            #assume its the first column
-            Z=numpy.matrix(X[:,1:])
-        # logging.debug(X.head())
-        
 
-        Z_M_Z=Z.T*M_0*Z
 
 
         df_pred=pd.DataFrame({'upper_pred':numpy.zeros(X.shape[0]),'lower_pred':numpy.zeros(X.shape[0])})
@@ -230,12 +232,18 @@ class LinModel(linear_model.LinearRegression):
         t_val=stats.t.ppf(1-alpha/2,self.df_resid+1)
         for indx in df_pred.index:
             # print(df_pred.ix[indx].values[1:])
-            # print(self.X_bar)
-            x_0_x_bar=numpy.matrix(X.ix[indx].values[1:]-self.X_bar)
+            # logging.debug(self.X_bar)
+            # logging.debug(X.head())
+            if "alpha" in self.independent_:
+                x_0_x_bar=numpy.matrix(X.ix[indx].values[1:]-self.X_bar)
+            else:
+                x_0_x_bar=numpy.matrix(X.ix[indx].values-self.X_bar)
+            
+            
             # print(numpy.shape(x_0_x_bar))
             # print("************")
             se_e = self.s_y*numpy.sqrt(1 + (1/self.nobs) +
-                x_0_x_bar*inv(Z_M_Z)*x_0_x_bar.T)
+                x_0_x_bar*inv(self.Z_M_Z)*x_0_x_bar.T)
 
             df_pred.loc[indx,'upper_pred']=df_pred.loc[indx,'y_hat']+t_val*se_e
             df_pred.loc[indx,'lower_pred']=df_pred.loc[indx,'y_hat']-t_val*se_e
@@ -314,3 +322,16 @@ def test_conf_interval_for_coefs():
 
     assert 100*rmse/ci.shape[0]<0.1
     print("Error on confidence interval: {} %".format(100*rmse))
+
+def test_data(df=[]):
+    import statsmodels.api as sm
+    print(df.describe())
+    est = sm.OLS(df.y, df[df.columns[df.columns!='y']]).fit()
+    print(est.summary())
+    logging.info("Now for this algorithm")
+    lr=LinModel()
+    X=df[df.columns[df.columns!='y']]
+    y=df.y
+
+    lr.fit(X=X,y=y)
+    lr.summary()
