@@ -123,8 +123,8 @@ class LinModel(linear_model.LinearRegression):
 
         return df_res
 
-    def get_coefs_as_df(self):
-        return pd.DataFrame({'coef':self.coef_},index=self.independent_)
+    def get_coefs_as_ts(self):
+        return pd.Series(self.coef_,index=self.independent_)
 
     def summary(self):
         print("---------------------------------------")
