@@ -58,7 +58,7 @@ class LinModel(linear_model.LinearRegression):
         #square root of this is the standard error of the regression
         s_2 = SSR / (self.df_resid+1)
         self.s_y=numpy.sqrt(s_2)
-        #print(s_2)
+        # logging.debug("s_y = {}".format(self.s_y))
 
         #Also get the means of the independent variables
         if isinstance(X,pd.core.frame.DataFrame):
@@ -248,7 +248,7 @@ class LinModel(linear_model.LinearRegression):
             df_pred.loc[indx,'upper_pred']=df_pred.loc[indx,'y_hat']+t_val*se_e
             df_pred.loc[indx,'lower_pred']=df_pred.loc[indx,'y_hat']-t_val*se_e
 
-            df_pred.loc[indx,'percent_ci']=100*2*t_val*se_e/df_pred.loc[indx,'y_hat']
+            df_pred.loc[indx,'percent_ci']=100*2*t_val*se_e/numpy.abs(df_pred.loc[indx,'y_hat'])
         return df_pred
 
 
