@@ -43,6 +43,7 @@ class LinModel(linear_model.LinearRegression):
         #standard error of the regression 
         y_bar=y.mean()
         y_hat=self.predict(X)
+        # logging.debug(X)
         self.fittedvalues=y_hat
         #explained sum of squares
         SSE=numpy.sum([numpy.power(val-y_bar,2) for val in y_hat])
@@ -242,6 +243,8 @@ class LinModel(linear_model.LinearRegression):
             
             # print(numpy.shape(x_0_x_bar))
             # print("************")
+            # logging.debug(self.Z_M_Z)
+            # logging.debug(x_0_x_bar)
             se_e = self.s_y*numpy.sqrt(1 + (1/self.nobs) +
                 x_0_x_bar*inv(self.Z_M_Z)*x_0_x_bar.T)
 
