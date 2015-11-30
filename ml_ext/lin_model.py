@@ -43,6 +43,9 @@ class LinModel(linear_model.LinearRegression):
         #standard error of the regression 
         y_bar=y.mean()
         y_hat=self.predict(X)
+
+        self.raw_data=X
+        self.training=y
         # logging.debug(X)
         self.fittedvalues=y_hat
         #explained sum of squares
@@ -110,6 +113,19 @@ class LinModel(linear_model.LinearRegression):
         self.f_stat=f_value
         self.f_pvalue=stats.f.pdf(f_value,self.df_model,self.df_resid+1)
         # return self
+
+    def output_data_to_file(self,fname=""):
+        """
+
+        We're assuing that raw_data is a DataFrame
+
+        """
+        df_out=self.raw_data.copy()
+        df_out['y_pred']=self.fittedvalues
+        df_out['residuals']=self.resid
+        df_out['y']=self.training
+
+        df_out.to_csv(fname)
 
     def get_confidence_intervals_for_coefs(self):
         """
