@@ -26,6 +26,12 @@ class LinModel(linear_model.LinearRegression):
         super(LinModel, self)\
                 .__init__(*args, **kwargs)
  
+    def fit_kfold(self,X,y,n_jobs=1):
+        """
+
+        Fit model using kfold validation
+
+        """
     def fit(self, X, y, n_jobs=1):
         """
         y can be series or array
