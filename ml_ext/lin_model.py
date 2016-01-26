@@ -56,6 +56,7 @@ class LinModel(linear_model.LinearRegression):
         # logging.debug(y)
         SST=numpy.sum([numpy.power(val-y_bar,2) for val in y])
         SSR=numpy.sum([numpy.power(x,2) for x in e])
+        self.ssr=SSR
         #print(SSR)
         
         #mean squared error of the residuals (unbiased)
@@ -168,6 +169,31 @@ class LinModel(linear_model.LinearRegression):
         print("df_model: {}".format(self.df_model))
         print("df_resid: {}".format(self.df_resid))
 
+    def get_log_likelihood(self):
+        
+        s2 = numpy.power(self.s_y,2)
+        #L = ( 1.0/numpy.sqrt(2*numpy.pi*s2) ) ** self.nobs * numpy.exp( -self.ssr/(s2*2.0) )
+        # logging.debug(( 1.0/numpy.sqrt(2*numpy.pi*s2) ) ** self.nobs)
+        # logging.debug(numpy.exp( -self.ssr/(s2*2.0) ))
+        # return self.nobs*( 1.0/numpy.sqrt(2*numpy.pi*s2))-(self.ssr/(s2*2.0))
+        return (-numpy.log(2*numpy.pi)*self.nobs/2)-\
+            (numpy.log(s2)*self.nobs/2)-(self.ssr/(s2*2.0))
+        # return numpy.log( L )
+
+    def get_AIC(self):
+        """
+
+        Akaike Information criterion for comparing between models
+
+        """
+        return 2*self.nparams-2*self.get_log_likelihood()
+    def get_BIC(self):
+        """
+
+        Bayesian Information criterion for comparing between models
+        
+        """
+        return self.nparams*numpy.log(self.nobs)-2*self.get_log_likelihood()
     def get_confidence_interval_for_mean(self,X=[]):
         """
 
