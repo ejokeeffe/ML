@@ -6,6 +6,7 @@ from ml_ext import logging
 from ml_ext import inv
 from ml_ext import plt
 from ml_ext import sns
+from sklearn import metrics as skmetrics
 
 def get_MAPE(y=[],y_hat=[]):
 	"""
@@ -20,3 +21,15 @@ def get_MAPE(y=[],y_hat=[]):
 		MAPE=MAPE+numpy.abs((y[ii]-y_hat[ii])/y[ii])
 	MAPE=100*MAPE/n
 	return MAPE
+
+def get_RMSE_pc(y=[],y_hat=[]):
+	"""
+
+	Get the mean absolute percentage error
+	$RMSE_pc\frac{100}{\bar{y}}\sqrt{\frac{1}{n}\sum_{i=0}^{n-1} ( y_i-\hat{y_i} )^2}$
+
+	"""
+	
+	rmse=numpy.sqrt(skmetrics.mean_squared_error(y,y_hat))
+	rmse_pc=100*rmse/numpy.mean(y)
+	return rmse_pc

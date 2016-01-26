@@ -6,6 +6,7 @@ from ml_ext import logging
 from ml_ext import inv
 from ml_ext import plt
 from ml_ext import sns
+from ml_ext import metrics
 
 
 class LinModel(linear_model.LinearRegression):
@@ -69,6 +70,7 @@ class LinModel(linear_model.LinearRegression):
         #square root of this is the standard error of the regression
         s_2 = SSR / (self.df_resid+1)
         self.s_y=numpy.sqrt(s_2)
+        self.RMSE_pc=metrics.get_RMSE_pc(y,y_hat)
         # logging.debug("s_y = {}".format(self.s_y))
 
         #Also get the means of the independent variables
@@ -174,6 +176,9 @@ class LinModel(linear_model.LinearRegression):
         print("N observations: {}".format(self.nobs))
         print("df_model: {}".format(self.df_model))
         print("df_resid: {}".format(self.df_resid))
+        print("RMSE: {}".format(self.s_y))
+        print("RMSE pc: {}".format(self.RMSE_pc))
+        
 
     def get_log_likelihood(self):
         
